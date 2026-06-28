@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>مسابقة توقعات كأس العالم 2026 - دور الـ 32</title>
+  <!-- React & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Cairo', sans-serif; background-color: #0f172a; color: #f8fafc; }
+  </style>
+</head>
+<body>
+  <div id="boot"></div>
+
+  <!-- Firebase App & Database -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    // ⚠️ ضع مفاتيح Firebase الخاصة بك هنا
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_AUTH_DOMAIN",
+      databaseURL: "YOUR_DATABASE_URL",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_STORAGE_BUCKET",
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // قائمة مباريات دور الـ 32 الافتراضية (يمكنك تعديل أسماء المنتخبات)
+    const matchesRound32 = [
+      { id: 1, teamA: "المجموعة A1", teamB: "المجموعة B2", time: "مباراة 1" },
+      { id: 2, teamA: "المجموعة C1", teamB: "المجموعة D2", time: "مباراة 2" },
+      { id: 3, teamA: "المجموعة E1", teamB: "المجموعة F2", time: "مباراة 3" },
+      { id: 4, teamA: "المجموعة G1", teamB: "المجموعة H2", time: "مباراة 4" },
+      { id: 5, teamA: "المجموعة B1", teamB: "المجموعة A2", time: "مباراة 5" },
+      { id: 6, teamA: "المجموعة D1", teamB: "المجموعة C2", time: "مباراة 6" },
+      { id: 7, teamA: "المجموعة F1", teamB: "المجموعة E2", time: "مباراة 7" },
+      { id: 8, teamA: "المجموعة H1", teamB: "المجموعة G2", time: "مباراة 8" },
+      { id: 9, teamA: "المجموعة I1", teamB: "المجموعة J2", time: "مباراة 9" },
+      { id: 10, teamA: "المجموعة K1", teamB: "المجموعة L2", time: "مباراة 10" },
+      { id: 11, teamA: "المجموعة J1", teamB: "المجموعة I2", time: "مباراة 11" },
+      { id: 12, teamA: "المجموعة L1", teamB: "المجموعة K2", time: "مباراة 12" },
+      { id: 13, teamA: "المجموعة M1", teamB: "المجموعة N2", time: "مباراة 13" },
+      { id: 14, teamA: "المجموعة N1", teamB: "المجموعة M2", time: "مباراة 14" },
+      { id: 15, teamA: "المجموعة O1", teamB: "المجموعة P2", time: "مباراة 15" },
+      { id: 16, teamA: "المجموعة P1", teamB: "المجموعة O2", time: "مباراة 16" }
+    ];
+
+    function App() {
+      const [screen, setScreen] = React.useState("login"); // login, userDashboard, admin
+      const [username, setUsername] = React.useState("");
+      const [adminPass, setAdminPass] = React.useState("");
+      const [predictions, setPredictions] = React.useState({});
+      const [actualResults, setActualResults] = React.useState({});
+      const [scores, setScores] = React.useState([]);
+      const [msg, setMsg] = React.useState("");
+
+      // تحميل النتائج الفعلية عند فتح التطبيق
+      React.useEffect(() => {
+        const dbRef = ref(db);
+        get(child(dbRef, "actualResults")).then((snapshot) => {
+          if (snapshot.exists()) setActualResults(snapshot.val());
+        });
+        loadLeaderboard();
+      }, []);
+
+      const loadLeaderboard = () => {
+        const dbRef = ref(db);
+        get(child(dbRef, "predictions")).then((snapshot) => {
+          if (snapshot.exists()) {
+            const allPreds = snapshot.val();
+            get(child(dbRef, "actualResults")).then((actSnapshot) => {
+              const act = actSnapshot.exists() ? actSnapshot.val() : {};
+              const list = Object.keys(allPreds).map(user => {
+                let score = 0;
+                matchesRound32.forEach(m => {
+                  const uPred = allPreds[user][m.id];
+                  const aRes = act[m.id];
+                  if (uPred && aRes && uPred.scoreA === aRes.scoreA && uPred.scoreB === aRes.scoreB) {
+                    score += 3; // توقع صحيح تماماً
+                  } else if (uPred && aRes && (Math.sign(uPred.scoreA - uPred.scoreB) === Math.sign(aRes.scoreA - aRes.scoreB))) {
+                    score += 1; // توقع الفائز صحيح لكن النتيجة مختلفة
+                  }
+                });
+                return { username: user, score };
+              });
+              setScores(list.sort((a, b) => b.score - a.score));
+            });
+          }
+        });
+      };
+
+      const handleUserLogin = (e) => {
+        e.preventDefault();
+        if (!username.trim()) return alert("الرجاء إدخال اسمك");
+        
+        // جلب توقعات المستخدم السابقة إن وجدت
+        get(child(ref(db), `predictions/${username}`)).then((snapshot) => {
+          if (snapshot.exists()) setPredictions(snapshot.val());
+          else setPredictions({});
+          setScreen("userDashboard");
+        });
+      };
+
+      const handleAdminLogin = (e) => {
+        e.preventDefault();
+        if (adminPass === "teacher2026") {
+          setScreen("admin");
+        } else {
+          alert("كلمة مرور المشرف خاطئة");
+        }
+      };
+
+      const saveUserPredictions = () => {
+        set(ref(db, `predictions/${username}`), predictions)
+          .then(() => { setMsg("تم حفظ توقعاتك بنجاح! 🎉"); setTimeout(() => setMsg(""), 3000); loadLeaderboard(); })
+          .catch(() => alert("حدث خطأ أثناء الحفظ"));
+      };
+
+      const saveAdminResults = () => {
+        set(ref(db, "actualResults"), actualResults)
+          .then(() => { alert("تم تحديث النتائج الفعلية وحساب النقاط!"); loadLeaderboard(); })
+          .catch(() => alert("حدث خطأ"));
+      };
+
+      const handlePredChange = (matchId, team, val) => {
+        setPredictions(prev => ({
+          ...prev,
+          [matchId]: { ...prev[matchId], [team]: parseInt(val) || 0 }
+        }));
+      };
+
+      const handleActualChange = (matchId, team, val) => {
+        setActualResults(prev => ({
+          ...prev,
+          [matchId]: { ...prev[matchId], [team]: parseInt(val) || 0 }
+        }));
+      };
+
+      return (
+        <div className="max-w-4xl mx-auto p-4">
+          <header className="text-center my-8">
+            <h1 className="text-3xl font-black text-amber-500 mb-2">🏆 مسابقة توقعات كأس العالم 2026 🏆</h1>
+            <p className="text-gray-400">توقع نتائج مباريات دور الـ 32 واجمع النقاط!</p>
+          </header>
+
+          {screen === "login" && (
+            <div className="grid md:grid-cols-2 gap-8 mt-12">
+              {/* قسم دخول المشتركين */}
+              <div className="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
+                <h2 className="text-xl font-bold mb-4 text-center text-emerald-400">دخول المشاركين</h2>
+                <form onSubmit={handleUserLogin} className="space-y-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">اسمك الثلاثي أو الثنائي لإظهاره في الترتيب:</label>
+                    <input type="text" value={username} onChange={e => setUsername(e.target.value)} className="w-full bg-slate-900 p-3 rounded-lg border border-slate-600 focus:outline-none focus:border-emerald-500 text-center text-lg" placeholder="اكتب اسمك هنا..." />
+                  </div>
+                  <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 font-bold p-3 rounded-lg transition">دخول وتوقع المباريات ⚽</button>
+                </form>
+              </div>
+
+              {/* قسم لوحة التحكم للمشرف */}
+              <div className="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700 flex flex-col justify-between">
+                <div>
+                  <h2 className="text-xl font-bold mb-4 text-center text-amber-400">لوحة تحكم المشرف</h2>
+                  <form onSubmit={handleAdminLogin} className="space-y-4">
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">كلمة مرور الإدارة:</label>
+                      <input type="password" value={adminPass} onChange={e => setAdminPass(e.target.value)} className="w-full bg-slate-900 p-3 rounded-lg border border-slate-600 focus:outline-none focus:border-amber-500 text-center" placeholder="••••••••" />
+                    </div>
+                    <button type="submit" className="w-full bg-amber-600 hover:bg-amber-500 font-bold p-3 rounded-lg transition">دخول الإدارة ⚙️</button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {screen === "userDashboard" && (
+            <div className="space-y-6">
+              <div className="bg-slate-800 p-4 rounded-xl flex justify-between items-center border border-slate-700">
+                <div>أهلاً بك يا <span className="text-emerald-400 font-bold text-lg">{username}</span> 👋</div>
+                <button onClick={() => setScreen("login")} className="bg-rose-600 hover:bg-rose-500 px-4 py-1.5 rounded-lg text-sm transition">تسجيل خروج</button>
+              </div>
+
+              {msg && <div className="bg-emerald-500/20 border border-emerald-500 text-emerald-300 p-3 rounded-lg text-center font-bold animate-pulse">{msg}</div>}
+
+              <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
+                <h2 className="text-xl font-bold mb-6 text-amber-500 text-center border-b border-slate-700 pb-3">مباريات دور الـ 32</h2>
+                <div className="space-y-4">
+                  {matchesRound32.map(m => (
+                    <div key={m.id} className="grid grid-cols-3 items-center bg-slate-900 p-4 rounded-xl border border-slate-800 text-center">
+                      <div className="font-semibold text-sm md:text-base">{m.teamA}</div>
+                      <div className="flex justify-center items-center gap-2">
+                        <input type="number" min="0" value={predictions[m.id]?.scoreA ?? ""} onChange={e => handlePredChange(m.id, "scoreA", e.target.value)} className="w-12 bg-slate-800 text-center p-2 rounded font-bold border border-slate-700 text-emerald-400" placeholder="0" />
+                        <span className="text-gray-500">X</span>
+                        <input type="number" min="0" value={predictions[m.id]?.scoreB ?? ""} onChange={e => handlePredChange(m.id, "scoreB", e.target.value)} className="w-12 bg-slate-800 text-center p-2 rounded font-bold border border-slate-700 text-emerald-400" placeholder="0" />
+                      </div>
+                      <div className="font-semibold text-sm md:text-base">{m.teamB}</div>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={saveUserPredictions} className="w-full bg-emerald-600 hover:bg-emerald-500 font-bold text-xl p-4 rounded-xl mt-6 transition shadow-lg shadow-emerald-950">حفظ جميع التوقعات 💾</button>
+              </div>
+            </div>
+          )}
+
+          {screen === "admin" && (
+            <div className="space-y-6">
+              <div className="bg-slate-800 p-4 rounded-xl flex justify-between items-center border border-slate-700">
+                <div className="text-amber-400 font-bold">لوحة التحكم وتحديث النتائج الرسمية ⚙️</div>
+                <button onClick={() => setScreen("login")} className="bg-rose-600 hover:bg-rose-500 px-4 py-1.5 rounded-lg text-sm transition">خروج</button>
+              </div>
+
+              <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
+                <h3 className="text-lg font-bold mb-4 text-center">أدخل النتائج الفعلية للمباريات بعد انتهائها:</h3>
+                <div className="space-y-4">
+                  {matchesRound32.map(m => (
+                    <div key={m.id} className="grid grid-cols-3 items-center bg-slate-900 p-4 rounded-xl text-center">
+                      <div>{m.teamA}</div>
+                      <div className="flex justify-center items-center gap-2">
+                        <input type="number" min="0" value={actualResults[m.id]?.scoreA ?? ""} onChange={e => handleActualChange(m.id, "scoreA", e.target.value)} className="w-12 bg-slate-800 text-center p-2 rounded font-bold border border-slate-600 text-amber-400" placeholder="-" />
+                        <span>X</span>
+                        <input type="number" min="0" value={actualResults[m.id]?.scoreB ?? ""} onChange={e => handleActualChange(m.id, "scoreB", e.target.value)} className="w-12 bg-slate-800 text-center p-2 rounded font-bold border border-slate-600 text-amber-400" placeholder="-" />
+                      </div>
+                      <div>{m.teamB}</div>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={saveAdminResults} className="w-full bg-amber-600 hover:bg-amber-500 font-bold p-4 rounded-xl mt-6 transition">تحديث وحساب النقاط فوراً 🔄</button>
+              </div>
+            </div>
+          )}
+
+          {/* جدول ترتيب المتوقعين والمشاركين المتوفر في كل الصفحات بأسفل الموقع */}
+          <div className="bg-slate-800 p-6 rounded-2xl mt-8 border border-slate-700 shadow-xl">
+            <h2 className="text-xl font-bold mb-4 text-center text-amber-400 border-b border-slate-700 pb-2">📊 جدول ترتيب التوقعات المباشر</h2>
+            {scores.length === 0 ? (
+              <p className="text-center text-gray-500 py-4">لا توجد توقعات مسجلة حتى الآن.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-right text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-700 text-gray-400">
+                      <th className="pb-2">الترتيب</th>
+                      <th className="pb-2">الاسم</th>
+                      <th className="pb-2 text-center">إجمالي النقاط</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scores.map((s, idx) => (
+                      <tr key={idx} className="border-b border-slate-800 hover:bg-slate-700/30 transition">
+                        <td className="py-3 font-bold text-gray-400">{idx + 1}</td>
+                        <td className="py-3 font-semibold text-emerald-300">{s.username}</td>
+                        <td className="py-3 text-center font-black text-amber-400 text-base">{s.score} ن</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    function mountApp() {
+      try {
+        const root = ReactDom.createRoot(document.getElementById("boot"));
+        root.render(React.createElement(App));
+      } catch(err) {
+        console.error(err);
+        document.getElementById("boot").innerHTML = '<div class="text-center text-red-500 p-4">حدث خطأ أثناء تحميل واجهة التطبيق</div>';
+      }
+    }
+    mountApp();
+  </script>
+</body>
+</html>
